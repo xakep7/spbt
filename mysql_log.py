@@ -106,6 +106,16 @@ class mysql_c:
 				trrows[rw['info_hash']] = rw
 		trr = None
 		print("fetched",len(trrows),"torrents")
+		trr = self.query("SELECT * from tracker_tpeers")
+		tpeers = {}
+		if(trr):
+			for rw in trr:
+				if(rw['tid'] not in tpeers):
+					tpeers[rw['tid']] = {}
+				tpeers[rw['tid']][rw['pid']] = rw['id']
+		trr = None
+		data2 = []
+		data2str = ""
 		for torrent in list(torrents):
 			fnd = False
 			trow = {}
@@ -122,20 +132,20 @@ class mysql_c:
 					datastr += "UPDATE tracker_torrents SET seeders='"+str(torrents[torrent]['seaders'])+"',leechers='"+str(torrents[torrent]['leechers'])+"',tsize='"+str(torrents[torrent]['size'])+"',completed='"+str(torrents[torrent]['completed'])+"' WHERE info_hash='"+torrent+"';"
 				else:
 					datastr += "UPDATE tracker_torrents SET seeders='"+str(torrents[torrent]['seaders'])+"',leechers='"+str(torrents[torrent]['leechers'])+"',completed='"+str(torrents[torrent]['completed'])+"',updated='"+str(torrents[torrent]['updated'])+"' WHERE info_hash='"+torrent+"';"
-			data2 = []
-			data2str = ""
+			
 			for user in list(torrents[torrent]['users']):
 				if(torrent in torrents and user in torrents[torrent]['users']):
-					q2 = self.query("SELECT * from tracker_tpeers WHERE tid='"+torrent+"' and pid='"+user+"' LIMIT 0,1")
-					if(not q2):
+					if(torrent not in tpeers or user not in tpeers[torrent]):
 						data2.append(tuple((0,user,torrent,torrents[torrent]['users'][user]['uploaded'],torrents[torrent]['users'][user]['complete'],torrents[torrent]['users'][user]['downloaded'],torrents[torrent]['users'][user]['timestamp'])))
 					else:
-						data2str += "UPDATE tracker_tpeers SET uploaded='"+str(torrents[torrent]['users'][user]['uploaded'])+"',completed='"+str(int(torrents[torrent]['users'][user]['complete']))+"',downloaded='"+str(torrents[torrent]['users'][user]['downloaded'])+"',mtime='"+str(torrents[torrent]['users'][user]['timestamp'])+"' WHERE tid='"+torrent+"' and pid='"+user+"';"
-			if(len(data2) > 0):
-				qq = "INSERT INTO tracker_tpeers (id,pid,tid,uploaded,completed,downloaded,mtime) VALUES (%s,%s,%s,%s,%s,%s,%s)"
-				self.query_multiinsert(qq,data2)
-			if(data2str != ""):
-				self.ihate_query_update(data2str)
+						data2str += "UPDATE tracker_tpeers SET uploaded='"+str(torrents[torrent]['users'][user]['uploaded'])+"',completed='"+str(int(torrents[torrent]['users'][user]['complete']))+"',downloaded='"+str(torrents[torrent]['users'][user]['downloaded'])+"',mtime='"+str(torrents[torrent]['users'][user]['timestamp'])+"' WHERE id='"+str(tpeers[torrent][user])+"';"
+		if(len(data2) > 0):
+			qq = "INSERT INTO tracker_tpeers (id,pid,tid,uploaded,completed,downloaded,mtime) VALUES (%s,%s,%s,%s,%s,%s,%s)"
+			self.query_multiinsert(qq,data2)
+		if(data2str != ""):
+			self.ihate_query_update(data2str)
+		data2 = []
+		data2str = ""
 		trrows = None
 		if(len(data) > 0):
 			qq = "INSERT INTO tracker_torrents (id,info_hash,seeders,leechers,tsize,completed,updated) VALUES (%s,%s,%s,%s,%s,%s,%s)"
