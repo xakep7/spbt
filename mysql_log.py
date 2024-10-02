@@ -129,7 +129,7 @@ class mysql_c:
 				if(trow['completed'] > torrents[torrent]['completed']):
 					torrents[torrent]['completed'] = torrents[torrent]['completed'] + trow['completed']
 				if(trow['tsize'] < torrents[torrent]['size'] and torrents[torrent]['size'] < 1099511627776):
-					datastr += "UPDATE tracker_torrents SET seeders='"+str(torrents[torrent]['seaders'])+"',leechers='"+str(torrents[torrent]['leechers'])+"',tsize='"+str(torrents[torrent]['size'])+"',completed='"+str(torrents[torrent]['completed'])+"' WHERE info_hash='"+torrent+"';"
+					datastr += "UPDATE tracker_torrents SET seeders='"+str(torrents[torrent]['seaders'])+"',leechers='"+str(torrents[torrent]['leechers'])+"',tsize='"+str(torrents[torrent]['size'])+"',completed='"+str(torrents[torrent]['completed'])+"',updated='"+str(torrents[torrent]['updated'])+"' WHERE info_hash='"+torrent+"';"
 				else:
 					datastr += "UPDATE tracker_torrents SET seeders='"+str(torrents[torrent]['seaders'])+"',leechers='"+str(torrents[torrent]['leechers'])+"',completed='"+str(torrents[torrent]['completed'])+"',updated='"+str(torrents[torrent]['updated'])+"' WHERE info_hash='"+torrent+"';"
 			
