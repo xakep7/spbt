@@ -73,21 +73,22 @@ class mysql_c:
 		u = {}
 		if(tru):
 			for rw in tru:
-				u[rw['peerhash']] = rw['id']
+				u[rw['peerhash']] = rw
 		print("fetched",len(u),"users")
 		for user in list(users):
 			fnd = False
 			id = 0
 			if(tru):
 				if(user in u):
-					id = u[user]
+					rw = u[user]
 					fnd = True
 			if(not fnd):
 				if('UA' not in users[user] or users[user]['UA'] is None):
 					users[user]['UA'] = "Not Defined"
 				data.append(tuple((0,user, str(users[user]['peerid'].encode('utf8','surrogateescape').hex()).encode(), users[user]['addr'], users[user]['port'], users[user]['created'], users[user]['updated'], users[user]['UA'])))
 			else:
-				datastr += "UPDATE tracker_users SET utime='"+str(users[user]['updated'])+"' WHERE id='"+str(id)+"';"
+				if(users[user]['updated'] > rw['utime']):
+					datastr += "UPDATE tracker_users SET utime='"+str(users[user]['updated'])+"' WHERE id='"+str(rw['id'])+"';"
 		tru = None
 		u = {}
 		if(len(data) > 0):
@@ -112,7 +113,7 @@ class mysql_c:
 			for rw in trr:
 				if(rw['tid'] not in tpeers):
 					tpeers[rw['tid']] = {}
-				tpeers[rw['tid']][rw['pid']] = rw['id']
+				tpeers[rw['tid']][rw['pid']] = rw
 		trr = None
 		data2 = []
 		data2str = ""
@@ -128,17 +129,19 @@ class mysql_c:
 			else:
 				if(trow['completed'] > torrents[torrent]['completed']):
 					torrents[torrent]['completed'] = torrents[torrent]['completed'] + trow['completed']
-				if(trow['tsize'] < torrents[torrent]['size'] and torrents[torrent]['size'] < 1099511627776):
-					datastr += "UPDATE tracker_torrents SET seeders='"+str(torrents[torrent]['seaders'])+"',leechers='"+str(torrents[torrent]['leechers'])+"',tsize='"+str(torrents[torrent]['size'])+"',completed='"+str(torrents[torrent]['completed'])+"',updated='"+str(torrents[torrent]['updated'])+"' WHERE info_hash='"+torrent+"';"
-				else:
-					datastr += "UPDATE tracker_torrents SET seeders='"+str(torrents[torrent]['seaders'])+"',leechers='"+str(torrents[torrent]['leechers'])+"',completed='"+str(torrents[torrent]['completed'])+"',updated='"+str(torrents[torrent]['updated'])+"' WHERE info_hash='"+torrent+"';"
+				if(trow['updated'] < torrents[torrent]['updated']):
+					if(trow['tsize'] < torrents[torrent]['size'] and torrents[torrent]['size'] < 1099511627776):
+						datastr += "UPDATE tracker_torrents SET seeders='"+str(torrents[torrent]['seaders'])+"',leechers='"+str(torrents[torrent]['leechers'])+"',tsize='"+str(torrents[torrent]['size'])+"',completed='"+str(torrents[torrent]['completed'])+"',updated='"+str(torrents[torrent]['updated'])+"' WHERE info_hash='"+torrent+"';"
+					else:
+						datastr += "UPDATE tracker_torrents SET seeders='"+str(torrents[torrent]['seaders'])+"',leechers='"+str(torrents[torrent]['leechers'])+"',completed='"+str(torrents[torrent]['completed'])+"',updated='"+str(torrents[torrent]['updated'])+"' WHERE info_hash='"+torrent+"';"
 			
 			for user in list(torrents[torrent]['users']):
 				if(torrent in torrents and user in torrents[torrent]['users']):
 					if(torrent not in tpeers or user not in tpeers[torrent]):
 						data2.append(tuple((0,user,torrent,torrents[torrent]['users'][user]['uploaded'],torrents[torrent]['users'][user]['complete'],torrents[torrent]['users'][user]['downloaded'],torrents[torrent]['users'][user]['timestamp'])))
 					else:
-						data2str += "UPDATE tracker_tpeers SET uploaded='"+str(torrents[torrent]['users'][user]['uploaded'])+"',completed='"+str(int(torrents[torrent]['users'][user]['complete']))+"',downloaded='"+str(torrents[torrent]['users'][user]['downloaded'])+"',mtime='"+str(torrents[torrent]['users'][user]['timestamp'])+"' WHERE id='"+str(tpeers[torrent][user])+"';"
+						if(tpeers[torrent][user]['mtime'] < torrents[torrent]['users'][user]['timestamp']):
+							data2str += "UPDATE tracker_tpeers SET uploaded='"+str(torrents[torrent]['users'][user]['uploaded'])+"',completed='"+str(int(torrents[torrent]['users'][user]['complete']))+"',downloaded='"+str(torrents[torrent]['users'][user]['downloaded'])+"',mtime='"+str(torrents[torrent]['users'][user]['timestamp'])+"' WHERE id='"+str(tpeers[torrent][user]['id'])+"';"
 		if(len(data2) > 0):
 			qq = "INSERT INTO tracker_tpeers (id,pid,tid,uploaded,completed,downloaded,mtime) VALUES (%s,%s,%s,%s,%s,%s,%s)"
 			self.query_multiinsert(qq,data2)
@@ -152,6 +155,8 @@ class mysql_c:
 			self.query_multiinsert(qq,data)
 		if(datastr != ""):
 			self.ihate_query_update(datastr)
+		data = []
+		datastr = ""
 		self.query_update("DELETE FROM tracker_users WHERE utime < "+str(self.timestamp() - int(self.interval*1.2)))
 		self.query_update("DELETE FROM tracker_torrents WHERE updated < "+str(self.timestamp() - int(self.interval*1.2)))
 		self.query_update("DELETE FROM tracker_tpeers WHERE mtime < "+str(self.timestamp() - int(self.interval*1.2)))
