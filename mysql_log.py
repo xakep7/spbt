@@ -1,6 +1,7 @@
 import mysql.connector
 import time,configparser
-from mysql.connector import connect, Error,errors
+from mysql.connector import Error,errors
+#from mysql.connector.aio import connect
 connection_2 = None
 #In this code you'll see some shit...
 class mysql_c:  
@@ -54,7 +55,7 @@ class mysql_c:
 					print("Table tracker_stats not found. Creating...")
 					cursor.execute("create table if not exists tracker_stats (id int not null auto_increment,reqs double(6,2) not null default 0,seeds int(11) not null default 0, leech int(11) not null default 0, users int(11) not null default 0, torrents int(11) not null default 0, tstamp int(11) not null default 0,primary key (id),unique key (tstamp));")
 
-				print("DB initialized. Starting tracker server")
+				print("DB initialized.")
 			else:
 				print("DB connection failed. Tables not found.",len(result))
 	
@@ -125,12 +126,14 @@ class mysql_c:
 					trow = trrows[torrent]
 					fnd = True
 			if(not fnd):
+				if(torrents[torrent]['size'] > pow(1024,4)):
+					torrents[torrent]['size'] = 0
 				data.append(tuple((0,torrent, torrents[torrent]['seaders'],torrents[torrent]['leechers'],torrents[torrent]['size'],torrents[torrent]['completed'],torrents[torrent]['updated'])))
 			else:
 				if(trow['completed'] > torrents[torrent]['completed']):
 					torrents[torrent]['completed'] = torrents[torrent]['completed'] + trow['completed']
 				if(trow['updated'] < torrents[torrent]['updated']):
-					if(trow['tsize'] < torrents[torrent]['size'] and torrents[torrent]['size'] < 1099511627776):
+					if(trow['tsize'] < torrents[torrent]['size'] and torrents[torrent]['size'] < pow(1024,4)):
 						datastr += "UPDATE tracker_torrents SET seeders='"+str(torrents[torrent]['seaders'])+"',leechers='"+str(torrents[torrent]['leechers'])+"',tsize='"+str(torrents[torrent]['size'])+"',completed='"+str(torrents[torrent]['completed'])+"',updated='"+str(torrents[torrent]['updated'])+"' WHERE info_hash='"+torrent+"';"
 					else:
 						datastr += "UPDATE tracker_torrents SET seeders='"+str(torrents[torrent]['seaders'])+"',leechers='"+str(torrents[torrent]['leechers'])+"',completed='"+str(torrents[torrent]['completed'])+"',updated='"+str(torrents[torrent]['updated'])+"' WHERE info_hash='"+torrent+"';"
