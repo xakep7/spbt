@@ -18,7 +18,7 @@ from signal import signal, SIGPIPE, SIG_DFL
 from socket import error as SocketError
 import errno
 
-vers = "SPBT v0.4.8"
+vers = "SPBT v0.4.9"
 server_host = ''
 server_port = 8050
 interval = 1800
@@ -56,6 +56,7 @@ def run(server_class=HTTPServer, handler_class=BaseHTTPRequestHandler):
 	try:
 		print(time_s()," Tracker started")
 		httpd.serve_forever()
+		print(time_s()," Tracker working")
 	except KeyboardInterrupt:
 		httpd.server_close()
 def remove_array_item(array, item):
@@ -328,6 +329,32 @@ def cleanup_users():
 			del torrents[tr]
 	print(time_s(),"Cleanup complete. Users:",len(users),"torrents",len(torrents)," leech:",req_stats['users']['leechers'],"seeds:",req_stats['users']['seaders'])
 
+def logging():
+	msq_c = mysql_c(cfg.get("MYSQL","HOST"), cfg.get("MYSQL","USER"), cfg.get("MYSQL","PASSWORD"), cfg.get("MYSQL","NAME"))
+	while 1:
+		ts = time_s()
+		ds = ts.split(':')
+		if(req_stats['last_log'] < timestamp() + mysql_reload and mysql_loging==1):
+			#print("this time",reltime)
+			if(int(float(ds[1])) % reltime == 0 and int(float(ds[2])) == 00):
+				print(time_s()," Update stats: Started")
+				if(req_stats['last_log'] == 0):
+					print(time_s()," Update stats: need to sync time. Aborted. Last:",req_stats['last_log'])
+					req_stats['last_log'] = timestamp()
+					req_stats['last_ann'] = req_stats['ann']
+					req_stats['start_time'] = stime
+					mysql_logging_thread = threading.Thread(target=msq_c.log,args=(req_stats,torrents,users), daemon=True)
+					mysql_logging_thread.start()
+				else:
+					mysql_logging_thread = threading.Thread(target=msq_c.log,args=(req_stats,torrents,users), daemon=True)
+					mysql_logging_thread.start()
+					req_stats['last_log'] = timestamp()
+					req_stats['last_ann'] = req_stats['ann']
+					print(time_s()," Update stats: Completed")
+				cleanup_thread = threading.Thread(target=cleanup_users, daemon=True)
+				cleanup_thread.start()
+		time.sleep(1)
+	
 if __name__ == '__main__':
 	parser = argparse.ArgumentParser()
 	parser.add_argument('-c', '--clear', action='store_true', help='clear the display on exit')
@@ -356,31 +383,13 @@ if __name__ == '__main__':
 		else:
 			print (time_s(),' Mysql connection disabled ',mysql_loging)
 		print (time_s(),' Starting server at port tcp ',server_host,':', server_port," header:",cf_header)
-		tr = threading.Thread(target=run, daemon=True)
-		tr.start()
-		while 1:
-			ts = time_s()
-			ds = ts.split(':')
-			if(req_stats['last_log'] < timestamp() + mysql_reload and mysql_loging==1):
-				#print("this time",reltime)
-				if(int(float(ds[1])) % reltime == 0 and int(float(ds[2])) == 00):
-					print(time_s()," Update stats: Started")
-					if(req_stats['last_log'] == 0):
-						print(time_s()," Update stats: need to sync time. Aborted. Last:",req_stats['last_log'])
-						req_stats['last_log'] = timestamp()
-						req_stats['last_ann'] = req_stats['ann']
-						req_stats['start_time'] = stime
-						tr3 = threading.Thread(target=msq.log,args=(req_stats,torrents,users), daemon=True)
-						tr3.start()
-					else:
-						tr3 = threading.Thread(target=msq.log,args=(req_stats,torrents,users), daemon=True)
-						tr3.start()
-						req_stats['last_log'] = timestamp()
-						req_stats['last_ann'] = req_stats['ann']
-						print(time_s()," Update stats: Completed")
-					tr2 = threading.Thread(target=cleanup_users, daemon=True)
-					tr2.start()
-			time.sleep(1)
+		httpdserverthread = threading.Thread(target=run, daemon=True)
+		httpdserverthread.start()
+		if(mysql_loging==1):
+			print(time_s()," Start logging subprocces")
+			logging = threading.Thread(target=logging,daemon=True)
+			logging.start()
+		httpdserverthread.join()
 		#threading.Thread(run(handler_class=HttpGetHandler)).start()
 		#run(handler_class=HttpGetHandler)
 			
