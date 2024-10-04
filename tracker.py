@@ -11,7 +11,7 @@ from http.server import ThreadingHTTPServer, BaseHTTPRequestHandler
 from http.server import HTTPServer
 import bencodepy
 import hashlib
-import urllib
+import urllib,gc
 import threading,struct,netaddr,configparser,socket
 from mysql_log import *
 from signal import signal, SIGPIPE, SIG_DFL
@@ -32,6 +32,7 @@ users = {}
 req_stats = {"ann":0,"scrape":0,"users":{"seaders":0,"leechers":0},"last_log":0,"last_ann":0,"start_time":0}
 cgitb.enable()
 signal(SIGPIPE,SIG_DFL)
+last_clean = 0
 
 def is_json(json_arr):
 	try:
@@ -291,8 +292,8 @@ class HttpGetHandler(BaseHTTPRequestHandler):
 						else:
 							peers_ipv6[d] = {"peer id":users[torrents[get_req['info_hash']]['users'][user]['peer']]['peerid'],"ip":users[torrents[get_req['info_hash']]['users'][user]['peer']]['addr'],"port":users[torrents[get_req['info_hash']]['users'][user]['peer']]['port']}
 						d += 1
-			if(compact == 1):
-				peers = str(peers)
+			#if(compact == 1):
+			#	peers = str(peers)
 				#peers_ipv6 = str(peers_ipv6)
 			self.wfile.write(bencodepy.bencode({"interval":interval,"min interval":minint,"peers":peers,"peers6":peers_ipv6,"complete":seeds,"incomplete":leech}))
 		else:
@@ -304,37 +305,47 @@ def time_s():
 	return datetime.strftime(datetime.now(), "%H:%M:%S")
 
 def cleanup_users():
-	print(time_s(),"Cleanup Started. Users:",len(users),"torrents",len(torrents)," leech:",req_stats['users']['leechers'],"seeds:",req_stats['users']['seaders'])
-	for user in list(users):
-		if(users[user]['updated'] < int(timestamp() - interval*1.2)):
-			if('torrs' in users):
-				for tr in list(users['torrs']):
-					if(user in torrents[tr]['users']):
-						if(torrents[tr]['users'][user]['complete']):
-							torrents[tr]['seaders'] -= 1
-							req_stats['users']['seaders'] -= 1
-						else:
-							torrents[tr]['leechers'] -= 1
-							req_stats['users']['leechers'] -= 1
-						del torrents[tr]['users'][user]
-					if(torrents[tr]['seaders'] <= 0 and torrents[tr]['leechers'] <= 0):
-						del torrents[tr]
-			del users[user]
-	for tr in list(torrents):
-		if(torrents[tr]['seaders'] <= 0 and torrents[tr]['leechers'] <= 0):
-			del torrents[tr]
-		elif(torrents[tr]['updated'] < int(timestamp() - interval*1.2)):
-			req_stats['users']['seaders'] -= torrents[tr]['seaders']
-			req_stats['users']['leechers'] -= torrents[tr]['leechers']
-			del torrents[tr]
-	print(time_s(),"Cleanup complete. Users:",len(users),"torrents",len(torrents)," leech:",req_stats['users']['leechers'],"seeds:",req_stats['users']['seaders'])
+	global last_clean
+	while 1:
+		ts = time_s()
+		ds = ts.split(':')
+		if(last_clean <= timestamp() - cleanup_int):
+			print(time_s(),"Cleanup Started. Users:",len(users),"torrents",len(torrents)," leech:",req_stats['users']['leechers'],"seeds:",req_stats['users']['seaders'])
+			for user in list(users):
+				if(users[user]['updated'] < int(timestamp() - interval*1.2)):
+					if('torrs' in users):
+						for tr in list(users['torrs']):
+							if(user in torrents[tr]['users']):
+								if(torrents[tr]['users'][user]['complete']):
+									torrents[tr]['seaders'] -= 1
+									req_stats['users']['seaders'] -= 1
+								else:
+									torrents[tr]['leechers'] -= 1
+									req_stats['users']['leechers'] -= 1
+								del torrents[tr]['users'][user]
+							if(torrents[tr]['seaders'] <= 0 and torrents[tr]['leechers'] <= 0):
+								del torrents[tr]
+					del users[user]
+			for tr in list(torrents):
+				if(torrents[tr]['seaders'] <= 0 and torrents[tr]['leechers'] <= 0):
+					del torrents[tr]
+				elif(torrents[tr]['updated'] < int(timestamp() - interval*1.2)):
+					req_stats['users']['seaders'] -= torrents[tr]['seaders']
+					req_stats['users']['leechers'] -= torrents[tr]['leechers']
+					del torrents[tr]
+			print(time_s(),"Cleanup complete. Users:",len(users),"torrents",len(torrents)," leech:",req_stats['users']['leechers'],"seeds:",req_stats['users']['seaders'])
+			gc.collect()
+			counts = gc.get_count()
+			print(time_s(),"Cleanup garbage:",counts)
+			last_clean = timestamp()
+		time.sleep(1)
 
 def logging():
 	msq_c = mysql_c(cfg.get("MYSQL","HOST"), cfg.get("MYSQL","USER"), cfg.get("MYSQL","PASSWORD"), cfg.get("MYSQL","NAME"))
 	while 1:
 		ts = time_s()
 		ds = ts.split(':')
-		if(req_stats['last_log'] < timestamp() + mysql_reload and mysql_loging==1):
+		if(req_stats['last_log'] <= timestamp() - mysql_reload and mysql_loging==1):
 			#print("this time",reltime)
 			if(int(float(ds[1])) % reltime == 0 and int(float(ds[2])) == 00):
 				print(time_s()," Update stats: Started")
@@ -351,8 +362,6 @@ def logging():
 					req_stats['last_log'] = timestamp()
 					req_stats['last_ann'] = req_stats['ann']
 					print(time_s()," Update stats: Completed")
-				cleanup_thread = threading.Thread(target=cleanup_users, daemon=True)
-				cleanup_thread.start()
 		time.sleep(1)
 	
 if __name__ == '__main__':
@@ -375,11 +384,13 @@ if __name__ == '__main__':
 		cf_header = cfg.get("OPTIONS","cf_header")
 		mysql_loging = cfg.getint("OPTIONS","mysql_store")
 		mysql_reload = cfg.getint("OPTIONS","mysql_reload")
+		cleanup_int = cfg.getint("OPTIONS","cleanup_interval")
 		reltime = int(round(mysql_reload / 60,0))
 		if(mysql_loging == 1):
 			print (time_s(),' Mysql connection enabled')
 			msq = mysql_c(cfg.get("MYSQL","HOST"), cfg.get("MYSQL","USER"), cfg.get("MYSQL","PASSWORD"), cfg.get("MYSQL","NAME"))
 			torrents = msq.loadtorrents()
+			del msq
 		else:
 			print (time_s(),' Mysql connection disabled ',mysql_loging)
 		print (time_s(),' Starting server at port tcp ',server_host,':', server_port," header:",cf_header)
@@ -389,6 +400,10 @@ if __name__ == '__main__':
 			print(time_s()," Start logging subprocces")
 			logging = threading.Thread(target=logging,daemon=True)
 			logging.start()
+		cleanup_thread = threading.Thread(target=cleanup_users, daemon=True)
+		cleanup_thread.start()
+		gc.enable()
+		gc.set_threshold(mysql_reload, int(mysql_reload/2), int(mysql_reload/4))
 		httpdserverthread.join()
 		#threading.Thread(run(handler_class=HttpGetHandler)).start()
 		#run(handler_class=HttpGetHandler)
