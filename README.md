@@ -3,7 +3,19 @@ Simple Python Bittorrent Tracker (http only at this time)
 
 # Requirements
 - Python >= 3.7
-- Python extensions: mysql-connector-python,configparser,bencode.py,hashlib,urllib,threading,struct,netaddr,socket,http.server,cgitb,argparse,datetime,random,ipaddress,signal
+- Python extensions:
+  - mysql-connector-python
+  - configparser
+  - bencode.py
+  - hashlib
+  - urllib 
+  - threading
+  - struct
+  - netaddr
+  - http.server
+  - cgitb
+  - datetime
+  - ipaddress
 
 # Features
 - Http announce and scrape
@@ -23,5 +35,5 @@ This tracker software tested at spec:
 - 2x450 Gb NVMe PCI-e v3
 - 100k+ torrents and users. 580-700 announce req/s. Cpu consuption - 5-10%, Memory - 3-6%
   
-test tracker stats: https://tr2.trkb.ru/index.php?page=tracker
+test tracker stats: https://tr2.trkb.ru/index.php?page=tracker  
 Code may has some shitcoding. Alpha.
