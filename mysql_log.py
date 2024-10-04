@@ -91,7 +91,7 @@ class mysql_c:
 				if(users[user]['updated'] > rw['utime']):
 					datastr += "UPDATE tracker_users SET utime='"+str(users[user]['updated'])+"' WHERE id='"+str(rw['id'])+"';"
 		tru = None
-		u = {}
+		del u
 		if(len(data) > 0):
 			print("Inserting",len(data),"users")
 			qq = "INSERT INTO tracker_users (id,peerhash,peerid,addr,port,ctime,utime,useragent) VALUES (%s,%s,%s,%s,%s,%s,%s,%s)"
@@ -115,7 +115,7 @@ class mysql_c:
 				if(rw['tid'] not in tpeers):
 					tpeers[rw['tid']] = {}
 				tpeers[rw['tid']][rw['pid']] = rw
-		trr = None
+		del trr
 		data2 = []
 		data2str = ""
 		for torrent in list(torrents):
@@ -150,16 +150,16 @@ class mysql_c:
 			self.query_multiinsert(qq,data2)
 		if(data2str != ""):
 			self.ihate_query_update(data2str)
-		data2 = []
-		data2str = ""
-		trrows = None
+		del data2
+		del data2str
+		del trrows
 		if(len(data) > 0):
 			qq = "INSERT INTO tracker_torrents (id,info_hash,seeders,leechers,tsize,completed,updated) VALUES (%s,%s,%s,%s,%s,%s,%s)"
 			self.query_multiinsert(qq,data)
 		if(datastr != ""):
 			self.ihate_query_update(datastr)
-		data = []
-		datastr = ""
+		del data
+		del datastr
 		self.query_update("DELETE FROM tracker_users WHERE utime < "+str(self.timestamp() - int(self.interval*1.2)))
 		self.query_update("DELETE FROM tracker_torrents WHERE updated < "+str(self.timestamp() - int(self.interval*1.2)))
 		self.query_update("DELETE FROM tracker_tpeers WHERE mtime < "+str(self.timestamp() - int(self.interval*1.2)))
