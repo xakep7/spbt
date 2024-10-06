@@ -305,7 +305,7 @@ def time_s():
 	return datetime.strftime(datetime.now(), "%H:%M:%S")
 
 def cleanup_users():
-	global last_clean
+	global last_clean,users,torrents,req_stats
 	while 1:
 		ts = time_s()
 		ds = ts.split(':')
@@ -341,6 +341,8 @@ def cleanup_users():
 		time.sleep(1)
 
 def logging():
+	global mysql_c,mysql_reload,mysql_loging,req_stats,torrents,users,cfg
+	reltime = int(round(mysql_reload / 60,0))
 	msq_c = mysql_c(cfg.get("MYSQL","HOST"), cfg.get("MYSQL","USER"), cfg.get("MYSQL","PASSWORD"), cfg.get("MYSQL","NAME"))
 	while 1:
 		ts = time_s()
@@ -385,7 +387,6 @@ if __name__ == '__main__':
 		mysql_loging = cfg.getint("OPTIONS","mysql_store")
 		mysql_reload = cfg.getint("OPTIONS","mysql_reload")
 		cleanup_int = cfg.getint("OPTIONS","cleanup_interval")
-		reltime = int(round(mysql_reload / 60,0))
 		if(mysql_loging == 1):
 			print (time_s(),' Mysql connection enabled')
 			msq = mysql_c(cfg.get("MYSQL","HOST"), cfg.get("MYSQL","USER"), cfg.get("MYSQL","PASSWORD"), cfg.get("MYSQL","NAME"))
