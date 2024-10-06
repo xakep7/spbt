@@ -192,7 +192,7 @@ class mysql_c:
 		if(q):
 			for row in q:
 				if(row['leechers'] > 0 or row['seeders'] > 0):
-					torrents[row['info_hash']] = {"users":{},"leechers":0,"seaders":0,"size":row['tsize'],"completed":row['completed'],"updated":row['updated']}
+					torrents[row['info_hash']] = {"users":{},"leechers":row['leechers'],"seaders":row['seeders'],"size":row['tsize'],"completed":row['completed'],"updated":row['updated']}
 			print("loaded",len(torrents),"torrents From DB")
 		return torrents
 	def query_multiinsert(self,qr,data,tryes=0):
