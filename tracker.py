@@ -305,12 +305,12 @@ def time_s():
 	return datetime.strftime(datetime.now(), "%H:%M:%S")
 
 def cleanup_users():
-	global last_clean,users,torrents,req_stats
+	global last_clean,users,torrents,req_stats,cleanup_int
 	while 1:
 		ts = time_s()
 		ds = ts.split(':')
 		if(last_clean <= timestamp() - cleanup_int):
-			print(time_s(),"Cleanup Started. Users:",len(users),"torrents",len(torrents)," leech:",req_stats['users']['leechers'],"seeds:",req_stats['users']['seaders'])
+			#print(time_s(),"Cleanup Started. Users:",len(users),"torrents",len(torrents)," leech:",req_stats['users']['leechers'],"seeds:",req_stats['users']['seaders'])
 			for user in list(users):
 				if(users[user]['updated'] < int(timestamp() - interval*1.2)):
 					if('torrs' in users):
@@ -336,7 +336,7 @@ def cleanup_users():
 			print(time_s(),"Cleanup complete. Users:",len(users),"torrents",len(torrents)," leech:",req_stats['users']['leechers'],"seeds:",req_stats['users']['seaders'])
 			gc.collect()
 			counts = gc.get_count()
-			print(time_s(),"Cleanup garbage:",counts)
+			#print(time_s(),"Cleanup garbage:",counts)
 			last_clean = timestamp()
 		time.sleep(1)
 
@@ -349,7 +349,7 @@ def logging():
 		ds = ts.split(':')
 		if(req_stats['last_log'] <= timestamp() - mysql_reload and mysql_loging==1):
 			#print("this time",reltime)
-			if(int(float(ds[1])) % reltime == 0 and int(float(ds[2])) == 00):
+			if(int(ds[1]) % reltime == 0):
 				print(time_s()," Update stats: Started")
 				if(req_stats['last_log'] == 0):
 					print(time_s()," Update stats: need to sync time. Aborted. Last:",req_stats['last_log'])
