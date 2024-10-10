@@ -13,12 +13,12 @@ import bencodepy
 import hashlib
 import urllib,gc
 import threading,struct,netaddr,configparser,socket
-from mysql_log import *
+import multiprocessing as mp
 from signal import signal, SIGPIPE, SIG_DFL
 from socket import error as SocketError
 import errno
 
-vers = "SPBT v0.4.9"
+vers = "SPBT v0.4.9p1"
 server_host = ''
 server_port = 8050
 interval = 1800
@@ -33,6 +33,7 @@ req_stats = {"ann":0,"scrape":0,"users":{"seaders":0,"leechers":0},"last_log":0,
 cgitb.enable()
 signal(SIGPIPE,SIG_DFL)
 last_clean = 0
+background_tasks = set()
 
 def is_json(json_arr):
 	try:
@@ -271,8 +272,8 @@ class HttpGetHandler(BaseHTTPRequestHandler):
 					else:
 						torrents[get_req['info_hash']]['leechers'] -= 1
 						req_stats['users']['leechers'] -= 1
-					if(torrents[get_req['info_hash']]['users'][user]['peer'] in users):
-						users[torrents[get_req['info_hash']]['users'][user]['peer']]['torrs'] = remove_array_item(users[torrents[get_req['info_hash']]['users'][user]['peer']]['torrs'],get_req['info_hash'])
+					if(user in users):
+						users[user]['torrs'] = remove_array_item(users[user]['torrs'],get_req['info_hash'])
 					del torrents[get_req['info_hash']]['users'][user]
 				else:
 					if(torrents[get_req['info_hash']]['users'][user]['complete']):
@@ -307,8 +308,6 @@ def time_s():
 def cleanup_users():
 	global last_clean,users,torrents,req_stats,cleanup_int
 	while 1:
-		ts = time_s()
-		ds = ts.split(':')
 		if(last_clean <= timestamp() - cleanup_int):
 			#print(time_s(),"Cleanup Started. Users:",len(users),"torrents",len(torrents)," leech:",req_stats['users']['leechers'],"seeds:",req_stats['users']['seaders'])
 			for user in list(users):
@@ -340,10 +339,11 @@ def cleanup_users():
 			last_clean = timestamp()
 		time.sleep(1)
 
-def logging():
-	global mysql_c,mysql_reload,mysql_loging,req_stats,torrents,users,cfg
+def logging(mysql_c,mysql_reload,mysql_loging,req_stats,torrents,users,cfg):
 	reltime = int(round(mysql_reload / 60,0))
 	msq_c = mysql_c(cfg.get("MYSQL","HOST"), cfg.get("MYSQL","USER"), cfg.get("MYSQL","PASSWORD"), cfg.get("MYSQL","NAME"))
+	print(time_s()," Logging started")
+	manager = mp.Manager()
 	while 1:
 		ts = time_s()
 		ds = ts.split(':')
@@ -356,11 +356,11 @@ def logging():
 					req_stats['last_log'] = timestamp()
 					req_stats['last_ann'] = req_stats['ann']
 					req_stats['start_time'] = stime
-					mysql_logging_thread = threading.Thread(target=msq_c.log,args=(req_stats,torrents,users), daemon=True)
-					mysql_logging_thread.start()
+					mysql_proc = mp.Process(target=msq_c.log,args=(req_stats,torrents,users))
+					mysql_proc.start()
 				else:
-					mysql_logging_thread = threading.Thread(target=msq_c.log,args=(req_stats,torrents,users), daemon=True)
-					mysql_logging_thread.start()
+					mysql_proc = mp.Process(target=msq_c.log,args=(req_stats,torrents,users))
+					mysql_proc.start()
 					req_stats['last_log'] = timestamp()
 					req_stats['last_ann'] = req_stats['ann']
 					print(time_s()," Update stats: Completed")
@@ -387,8 +387,11 @@ if __name__ == '__main__':
 		mysql_loging = cfg.getint("OPTIONS","mysql_store")
 		mysql_reload = cfg.getint("OPTIONS","mysql_reload")
 		cleanup_int = cfg.getint("OPTIONS","cleanup_interval")
+		gc.enable()
+		gc.set_threshold(mysql_reload, int(mysql_reload/2), int(mysql_reload/4))
 		if(mysql_loging == 1):
 			print (time_s(),' Mysql connection enabled')
+			from mysql_log import *
 			msq = mysql_c(cfg.get("MYSQL","HOST"), cfg.get("MYSQL","USER"), cfg.get("MYSQL","PASSWORD"), cfg.get("MYSQL","NAME"))
 			torrents = msq.loadtorrents()
 			del msq
@@ -399,16 +402,19 @@ if __name__ == '__main__':
 		httpdserverthread.start()
 		if(mysql_loging==1):
 			print(time_s()," Start logging subprocces")
-			logging = threading.Thread(target=logging,daemon=True)
-			logging.start()
+			msql = threading.Thread(target=logging, args=(mysql_c,mysql_reload,mysql_loging,req_stats,torrents,users,cfg))
+			msql.start()
 		cleanup_thread = threading.Thread(target=cleanup_users, daemon=True)
 		cleanup_thread.start()
-		gc.enable()
-		gc.set_threshold(mysql_reload, int(mysql_reload/2), int(mysql_reload/4))
+		print(time_s()," Joining mainprocess")
 		httpdserverthread.join()
 		#threading.Thread(run(handler_class=HttpGetHandler)).start()
 		#run(handler_class=HttpGetHandler)
 			
 	except KeyboardInterrupt:
 		hunghttpd.server_close()
+		cleanup_thread.terminate()
+		cleanup_thread.join()
+		msql.terminate()
+		msql.join()
 		print('Error')
