@@ -267,11 +267,13 @@ class HttpGetHandler(BaseHTTPRequestHandler):
 				#print("peerhash:" , user)
 				if(torrents[get_req['info_hash']]['users'][user]['timestamp'] < timestamp() - interval*1.2):
 					if(torrents[get_req['info_hash']]['users'][user]['complete']):
-						torrents[get_req['info_hash']]['seaders'] -= 1
-						req_stats['users']['seaders'] -= 1
+						if(torrents[get_req['info_hash']]['seaders'] > 0):
+							torrents[get_req['info_hash']]['seaders'] -= 1
+							req_stats['users']['seaders'] -= 1
 					else:
-						torrents[get_req['info_hash']]['leechers'] -= 1
-						req_stats['users']['leechers'] -= 1
+						if(torrents[get_req['info_hash']]['leechers'] > 0):
+							torrents[get_req['info_hash']]['leechers'] -= 1
+							req_stats['users']['leechers'] -= 1
 					if(user in users):
 						users[user]['torrs'] = remove_array_item(users[user]['torrs'],get_req['info_hash'])
 					del torrents[get_req['info_hash']]['users'][user]
@@ -316,11 +318,13 @@ def cleanup_users():
 						for tr in list(users['torrs']):
 							if(user in torrents[tr]['users']):
 								if(torrents[tr]['users'][user]['complete']):
-									torrents[tr]['seaders'] -= 1
-									req_stats['users']['seaders'] -= 1
+									if(torrents[tr]['seaders'] > 0):
+										torrents[tr]['seaders'] -= 1
+										req_stats['users']['seaders'] -= 1
 								else:
-									torrents[tr]['leechers'] -= 1
-									req_stats['users']['leechers'] -= 1
+									if(torrents[tr]['leechers'] > 0):
+										torrents[tr]['leechers'] -= 1
+										req_stats['users']['leechers'] -= 1
 								del torrents[tr]['users'][user]
 							if(torrents[tr]['seaders'] <= 0 and torrents[tr]['leechers'] <= 0):
 								del torrents[tr]
