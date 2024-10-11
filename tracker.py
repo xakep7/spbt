@@ -334,8 +334,10 @@ def cleanup_users():
 				if(torrents[tr]['seaders'] <= 0 and torrents[tr]['leechers'] <= 0):
 					del torrents[tr]
 				elif(torrents[tr]['updated'] < int(timestamp() - interval*1.2)):
-					req_stats['users']['seaders'] -= torrents[tr]['seaders']
-					req_stats['users']['leechers'] -= torrents[tr]['leechers']
+					if(torrents[tr]['seaders'] > 0):
+						req_stats['users']['seaders'] -= torrents[tr]['seaders']
+					if(torrents[tr]['leechers'] > 0):
+						req_stats['users']['leechers'] -= torrents[tr]['leechers']
 					del torrents[tr]
 			print(time_s(),"Cleanup complete. Users:",len(users),"torrents",len(torrents)," leech:",req_stats['users']['leechers'],"seeds:",req_stats['users']['seaders'])
 			gc.collect()
