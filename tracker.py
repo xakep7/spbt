@@ -25,6 +25,7 @@ interval = 1800
 minint = 60
 stime = 0
 hunghttpd = None
+sub_run = True
 scrape_int = 120
 cf_header = "X-Forwarded-For"
 torrents = {}
@@ -309,7 +310,7 @@ def time_s():
 
 def cleanup_users():
 	global last_clean,users,torrents,req_stats,cleanup_int
-	while 1:
+	while sub_run:
 		if(last_clean <= timestamp() - cleanup_int):
 			#print(time_s(),"Cleanup Started. Users:",len(users),"torrents",len(torrents)," leech:",req_stats['users']['leechers'],"seeds:",req_stats['users']['seaders'])
 			for user in list(users):
@@ -348,7 +349,7 @@ def logging(mysql_c,mysql_reload,mysql_loging,req_stats,torrents,users,cfg):
 	msq_c = mysql_c(cfg.get("MYSQL","HOST"), cfg.get("MYSQL","USER"), cfg.get("MYSQL","PASSWORD"), cfg.get("MYSQL","NAME"))
 	print(time_s()," Logging started")
 	manager = mp.Manager()
-	while 1:
+	while sub_run:
 		ts = time_s()
 		ds = ts.split(':')
 		if(req_stats['last_log'] <= timestamp() - mysql_reload and mysql_loging==1):
@@ -417,8 +418,7 @@ if __name__ == '__main__':
 			
 	except KeyboardInterrupt:
 		hunghttpd.server_close()
-		cleanup_thread.terminate()
+		sub_run = False
 		cleanup_thread.join()
-		msql.terminate()
 		msql.join()
 		print('Error')
