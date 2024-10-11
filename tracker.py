@@ -18,7 +18,7 @@ from signal import signal, SIGPIPE, SIG_DFL
 from socket import error as SocketError
 import errno
 
-vers = "SPBT v0.4.9p2"
+vers = "SPBT v0.4.9p3"
 server_host = ''
 server_port = 8050
 interval = 1800
@@ -223,10 +223,29 @@ class HttpGetHandler(BaseHTTPRequestHandler):
 				torrents[get_req['info_hash']] = {"users":{},"leechers":0,"seaders":0,"size":0,"completed":0,"updated":timestamp()}
 			else:
 				torrents[get_req['info_hash']]['updated'] = timestamp()
-			if(get_req['left'] == 0):
-				complete = True
+			if('event' in get_req):
+				if(get_req['event'] == "started"):
+					complete = False
+				elif(get_req['event'] == "completed"):
+					complete = True
+				elif(get_req['event'] == "stopped"):
+					if(peerhash in torrents[get_req['info_hash']]['users']):
+						if(torrents[get_req['info_hash']]['users'][peerhash]['complete']):
+							torrents[get_req['info_hash']]['seaders'] -= 1
+							req_stats['users']['seaders'] -= 1
+						else:
+							torrents[get_req['info_hash']]['leechers'] -= 1
+							req_stats['users']['leechers'] -= 1
+						del torrents[get_req['info_hash']]['users'][peerhash]
+					self.wfile.write(bencodepy.bencode({"failure reason":"Stopped. End","min interval":minint}))
+					return 0
+				else:
+					complete = False
 			else:
-				complete = False
+				if(get_req['left'] == 0):
+					complete = True
+				else:
+					complete = False
 			if('size' in get_req):
 				if(get_req['size'] > 0):
 					size = get_req['size']
