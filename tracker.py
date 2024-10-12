@@ -328,7 +328,7 @@ def cleanup_users():
 			for user in list(users):
 				if(users[user]['updated'] < int(timestamp() - interval*1.2)):
 					if('torrs' in users):
-						for tr in list(users['torrs']):
+						for tr in list(users[user]['torrs']):
 							if(user in torrents[tr]['users']):
 								if(torrents[tr]['users'][user]['complete']):
 									if(torrents[tr]['seaders'] > 0):
@@ -343,7 +343,7 @@ def cleanup_users():
 								del torrents[tr]
 					del users[user]
 				if(user in users):
-					for tr in list(users['torrs']):
+					for tr in list(users[user]['torrs']):
 						if(user in torrents[tr]['users']):
 							if(torrents[tr]['users'][user]['timestamp'] < timestamp() - interval*1.2):
 								if(torrents[tr]['users'][user]['complete']):
