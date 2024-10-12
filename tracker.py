@@ -18,7 +18,7 @@ from signal import signal, SIGPIPE, SIG_DFL
 from socket import error as SocketError
 import errno
 
-vers = "SPBT v0.4.9p3"
+vers = "SPBT v0.4.9p4"
 server_host = ''
 server_port = 8050
 interval = 1800
@@ -145,22 +145,10 @@ class HttpGetHandler(BaseHTTPRequestHandler):
 			seeds = leech = 0
 			for user in list(torrents[get_req['info_hash']]['users']):
 				#print("peerhash:" , user)
-				if(torrents[get_req['info_hash']]['users'][user]['timestamp'] < timestamp() - interval*1.2):
-					#print(self.log_date_time_string()," delete user ", torrents[get_req['info_hash']]['users'][user]['peer']," timer reached: ", (time.time() - interval), ">",torrents[get_req['info_hash']]['users'][user]['timestamp'])
-					if(torrents[get_req['info_hash']]['users'][user]['complete']):
-						torrents[get_req['info_hash']]['seaders'] -= 1
-						req_stats['users']['seaders'] -= 1
-					else:
-						torrents[get_req['info_hash']]['leechers'] -= 1
-						req_stats['users']['leechers'] -= 1
-					if(torrents[get_req['info_hash']]['users'][user]['peer'] in users):
-						users[torrents[get_req['info_hash']]['users'][user]['peer']]['torrs'] = remove_array_item(users[torrents[get_req['info_hash']]['users'][user]['peer']]['torrs'],get_req['info_hash'])
-					del torrents[get_req['info_hash']]['users'][user]
+				if(torrents[get_req['info_hash']]['users'][user]['complete']):
+					seeds = seeds + 1
 				else:
-					if(torrents[get_req['info_hash']]['users'][user]['complete']):
-						seeds = seeds + 1
-					else:
-						leech = leech + 1
+					leech = leech + 1
 			self.wfile.write(bencodepy.bencode({"files":{get_req['info_hash']:{"complete":seeds,"incomplete":leech,"downloaded":seeds}},"flags":{"min_request_interval":scrape_int}}))
 		else:
 			self.wfile.write(bencodepy.bencode({"failure reason":"Invalid torrent","min interval":minint}))
@@ -225,7 +213,10 @@ class HttpGetHandler(BaseHTTPRequestHandler):
 				torrents[get_req['info_hash']]['updated'] = timestamp()
 			if('event' in get_req):
 				if(get_req['event'] == "started"):
-					complete = False
+					if(get_req['left'] == 0):
+						complete = True
+					else:
+						complete = False
 				elif(get_req['event'] == "completed"):
 					complete = True
 				elif(get_req['event'] == "stopped"):
@@ -237,6 +228,8 @@ class HttpGetHandler(BaseHTTPRequestHandler):
 							torrents[get_req['info_hash']]['leechers'] -= 1
 							req_stats['users']['leechers'] -= 1
 						del torrents[get_req['info_hash']]['users'][peerhash]
+						if(peerhash in users):
+							users[peerhash]['torrs'] = remove_array_item(users[peerhash]['torrs'],get_req['info_hash'])
 					self.wfile.write(bencodepy.bencode({"failure reason":"Stopped. End","min interval":minint}))
 					return 0
 				else:
@@ -285,36 +278,36 @@ class HttpGetHandler(BaseHTTPRequestHandler):
 				peers_ipv6 = {}
 			for user in list(torrents[get_req['info_hash']]['users']):
 				#print("peerhash:" , user)
-				if(torrents[get_req['info_hash']]['users'][user]['timestamp'] < timestamp() - interval*1.2):
-					if(torrents[get_req['info_hash']]['users'][user]['complete']):
-						if(torrents[get_req['info_hash']]['seaders'] > 0):
-							torrents[get_req['info_hash']]['seaders'] -= 1
-							req_stats['users']['seaders'] -= 1
-					else:
-						if(torrents[get_req['info_hash']]['leechers'] > 0):
-							torrents[get_req['info_hash']]['leechers'] -= 1
-							req_stats['users']['leechers'] -= 1
-					if(user in users):
-						users[user]['torrs'] = remove_array_item(users[user]['torrs'],get_req['info_hash'])
-					del torrents[get_req['info_hash']]['users'][user]
+				#if(torrents[get_req['info_hash']]['users'][user]['timestamp'] < timestamp() - interval*1.2):
+				#	if(torrents[get_req['info_hash']]['users'][user]['complete']):
+				#		if(torrents[get_req['info_hash']]['seaders'] > 0):
+				#			torrents[get_req['info_hash']]['seaders'] -= 1
+				#			req_stats['users']['seaders'] -= 1
+				#	else:
+				#		if(torrents[get_req['info_hash']]['leechers'] > 0):
+				#			torrents[get_req['info_hash']]['leechers'] -= 1
+				#			req_stats['users']['leechers'] -= 1
+				#	if(user in users):
+				#		users[user]['torrs'] = remove_array_item(users[user]['torrs'],get_req['info_hash'])
+				#	del torrents[get_req['info_hash']]['users'][user]
+				#else:
+				if(torrents[get_req['info_hash']]['users'][user]['complete']):
+					seeds = seeds + 1
 				else:
-					if(torrents[get_req['info_hash']]['users'][user]['complete']):
-						seeds = seeds + 1
+					leech = leech + 1
+				if(ipaddress.ip_address(users[torrents[get_req['info_hash']]['users'][user]['peer']]['addr']).version == 4):
+					if(compact == 1):
+						peers += ipaddress.ip_address(users[torrents[get_req['info_hash']]['users'][user]['peer']]['addr']).packed + struct.pack(">H",int(users[torrents[get_req['info_hash']]['users'][user]['peer']]['port']))
 					else:
-						leech = leech + 1
-					if(ipaddress.ip_address(users[torrents[get_req['info_hash']]['users'][user]['peer']]['addr']).version == 4):
-						if(compact == 1):
-							peers += ipaddress.ip_address(users[torrents[get_req['info_hash']]['users'][user]['peer']]['addr']).packed + struct.pack(">H",int(users[torrents[get_req['info_hash']]['users'][user]['peer']]['port']))
-						else:
-							peers[u] = {"peer id":users[torrents[get_req['info_hash']]['users'][user]['peer']]['peerid'],"ip":users[torrents[get_req['info_hash']]['users'][user]['peer']]['addr'],"port":users[torrents[get_req['info_hash']]['users'][user]['peer']]['port']}
-						u += 1
+						peers[u] = {"peer id":users[torrents[get_req['info_hash']]['users'][user]['peer']]['peerid'],"ip":users[torrents[get_req['info_hash']]['users'][user]['peer']]['addr'],"port":users[torrents[get_req['info_hash']]['users'][user]['peer']]['port']}
+					u += 1
+				else:
+					if(compact == 1):
+						#packed_ip = socket.inet_pton(socket.AF_INET6, users[torrents[get_req['info_hash']]['users'][user]['peer']]['addr']) + struct.pack(">H",int(users[torrents[get_req['info_hash']]['users'][user]['peer']]['port']))
+						peers_ipv6 += socket.inet_pton(socket.AF_INET6, users[torrents[get_req['info_hash']]['users'][user]['peer']]['addr']) + struct.pack(">H",int(users[torrents[get_req['info_hash']]['users'][user]['peer']]['port']))
 					else:
-						if(compact == 1):
-							#packed_ip = socket.inet_pton(socket.AF_INET6, users[torrents[get_req['info_hash']]['users'][user]['peer']]['addr']) + struct.pack(">H",int(users[torrents[get_req['info_hash']]['users'][user]['peer']]['port']))
-							peers_ipv6 += socket.inet_pton(socket.AF_INET6, users[torrents[get_req['info_hash']]['users'][user]['peer']]['addr']) + struct.pack(">H",int(users[torrents[get_req['info_hash']]['users'][user]['peer']]['port']))
-						else:
-							peers_ipv6[d] = {"peer id":users[torrents[get_req['info_hash']]['users'][user]['peer']]['peerid'],"ip":users[torrents[get_req['info_hash']]['users'][user]['peer']]['addr'],"port":users[torrents[get_req['info_hash']]['users'][user]['peer']]['port']}
-						d += 1
+						peers_ipv6[d] = {"peer id":users[torrents[get_req['info_hash']]['users'][user]['peer']]['peerid'],"ip":users[torrents[get_req['info_hash']]['users'][user]['peer']]['addr'],"port":users[torrents[get_req['info_hash']]['users'][user]['peer']]['port']}
+					d += 1
 			#if(compact == 1):
 			#	peers = str(peers)
 				#peers_ipv6 = str(peers_ipv6)
@@ -349,6 +342,20 @@ def cleanup_users():
 							if(torrents[tr]['seaders'] <= 0 and torrents[tr]['leechers'] <= 0):
 								del torrents[tr]
 					del users[user]
+				if(user in users):
+					for tr in list(users['torrs']):
+						if(user in torrents[tr]['users']):
+							if(torrents[tr]['users'][user]['timestamp'] < timestamp() - interval*1.2):
+								if(torrents[tr]['users'][user]['complete']):
+									if(torrents[tr]['seaders'] > 0):
+										torrents[tr]['seaders'] -= 1
+										req_stats['users']['seaders'] -= 1
+								else:
+									if(torrents[tr]['leechers'] > 0):
+										torrents[tr]['leechers'] -= 1
+										req_stats['users']['leechers'] -= 1
+								del torrents[tr]['users'][user]
+								users[user]['torrs'] = remove_array_item(users[user]['torrs'],tr)
 			for tr in list(torrents):
 				if(torrents[tr]['seaders'] <= 0 and torrents[tr]['leechers'] <= 0):
 					del torrents[tr]
