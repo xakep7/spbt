@@ -326,6 +326,7 @@ def cleanup_users():
 	while sub_run:
 		if(last_clean <= timestamp() - cleanup_int):
 			#print(time_s(),"Cleanup Started. Users:",len(users),"torrents",len(torrents)," leech:",req_stats['users']['leechers'],"seeds:",req_stats['users']['seaders'])
+			ts = tl = 0
 			for user in list(users):
 				if(users[user]['updated'] < int(timestamp() - interval*1.2)):
 					if('torrs' in users):
@@ -344,25 +345,28 @@ def cleanup_users():
 								del torrents[tr]
 					del users[user]
 				elif(user in users):
-					for tr in list(users[user]['torrs']):
-						if(tr in torrents):
-							if(user in torrents[tr]['users']):
-								if(torrents[tr]['users'][user]['timestamp'] < timestamp() - interval*1.2):
-									if(torrents[tr]['users'][user]['complete']):
-										if(torrents[tr]['seaders'] > 0):
-											torrents[tr]['seaders'] -= 1
-											req_stats['users']['seaders'] -= 1
-									else:
-										if(torrents[tr]['leechers'] > 0):
-											torrents[tr]['leechers'] -= 1
-											req_stats['users']['leechers'] -= 1
-									del torrents[tr]['users'][user]
+					if(len(users[user]['torrs']) > 0):
+						for tr in list(users[user]['torrs']):
+							if(tr in torrents):
+								if(user in torrents[tr]['users']):
+									if(torrents[tr]['users'][user]['timestamp'] < timestamp() - interval*1.2):
+										if(torrents[tr]['users'][user]['complete']):
+											if(torrents[tr]['seaders'] > 0):
+												torrents[tr]['seaders'] -= 1
+												req_stats['users']['seaders'] -= 1
+										else:
+											if(torrents[tr]['leechers'] > 0):
+												torrents[tr]['leechers'] -= 1
+												req_stats['users']['leechers'] -= 1
+										del torrents[tr]['users'][user]
+										users[user]['torrs'] = remove_array_item(users[user]['torrs'],tr)
+							else:
+								if(user in users):
 									users[user]['torrs'] = remove_array_item(users[user]['torrs'],tr)
-						else:
-							if(user in users):
-								users[user]['torrs'] = remove_array_item(users[user]['torrs'],tr)
-								if(len(users[user]['torrs']) == 0):
-									del users[user]
+									if(len(users[user]['torrs']) == 0):
+										del users[user]
+					else:
+						del users[user]
 			for tr in list(torrents):
 				if(torrents[tr]['seaders'] <= 0 and torrents[tr]['leechers'] <= 0):
 					del torrents[tr]
@@ -372,6 +376,25 @@ def cleanup_users():
 					if(torrents[tr]['leechers'] > 0):
 						req_stats['users']['leechers'] -= torrents[tr]['leechers']
 					del torrents[tr]
+				else:
+					s = l = 0
+					for usr in list(torrents[tr]['users']):
+						if(torrents[tr]['users'][usr]['timestamp'] < timestamp() - interval*1.2):
+							del torrents[tr]['users'][usr]
+							if(usr in users):
+								users[usr]['torrs'] = remove_array_item(users[usr]['torrs'],tr)
+								if(len(users[usr]['torrs']) == 0):
+									del users[usr]
+						elif(torrents[tr]['users'][usr]['complete']):
+							s += 1
+						else:
+							l += 1
+					torrents[tr]['leechers'] = l
+					torrents[tr]['seaders'] = s
+					ts += s
+					tl += l
+			req_stats['users']['leechers'] = tl
+			req_stats['users']['seaders'] = ts
 			print(time_s(),"Cleanup complete. Users:",len(users),"torrents",len(torrents)," leech:",req_stats['users']['leechers'],"seeds:",req_stats['users']['seaders'])
 			gc.collect()
 			counts = gc.get_count()
