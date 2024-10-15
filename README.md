@@ -5,17 +5,8 @@ Simple Python Bittorrent Tracker (http only at this time)
 - Python >= 3.7
 - Python extensions:
   - mysql-connector-python
-  - configparser
   - bencode.py
-  - hashlib
-  - urllib 
-  - threading
-  - struct
   - netaddr
-  - http.server
-  - cgitb
-  - datetime
-  - ipaddress
 
 # Features
 - Http announce and scrape
