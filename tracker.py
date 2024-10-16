@@ -18,7 +18,7 @@ from signal import signal, SIGPIPE, SIG_DFL
 from socket import error as SocketError
 import errno
 
-vers = "SPBT v0.4.9p5"
+vers = "SPBT v0.4.9p3"
 server_host = ''
 server_port = 8050
 interval = 1800
@@ -469,8 +469,24 @@ if __name__ == '__main__':
 			msql.start()
 		cleanup_thread = threading.Thread(target=cleanup_users, daemon=True)
 		cleanup_thread.start()
-		print(time_s()," Joining mainprocess")
-		httpdserverthread.join()
+		while True:
+			in_str = input()
+			if(in_str == "reload config"):
+				cfg.read("tracker.cfg")
+				interval = cfg.getint("OPTIONS","announce_refresh")
+				minint = cfg.getint("OPTIONS","announce_min")
+				scrape_int = cfg.getint("OPTIONS","scrape_int")
+				cf_header = cfg.get("OPTIONS","cf_header")
+				mysql_loging = cfg.getint("OPTIONS","mysql_store")
+				mysql_reload = cfg.getint("OPTIONS","mysql_reload")
+				cleanup_int = cfg.getint("OPTIONS","cleanup_interval")
+				gc.set_threshold(mysql_reload, int(mysql_reload/2), int(mysql_reload/4))
+				print("Config reloaded")
+			elif(in_str == "stats"):
+				print(time_s(),"Stats. Users:",len(users),"torrents",len(torrents)," eech:",req_stats['users']['leechers'],"seeds:",req_stats['users']['seaders'],"annonces:",req_stats['ann'], "scrapes:",req_stats['scrape'],"ann_req:",round((req_stats['ann']-req_stats['last_ann'])/(timestamp()-req_stats['last_log']),2))
+			else:
+				print("Undefined action")
+		
 		#threading.Thread(run(handler_class=HttpGetHandler)).start()
 		#run(handler_class=HttpGetHandler)
 			
