@@ -10,7 +10,10 @@ Simple Python Bittorrent Tracker (http only at this time)
 
 # Features
 - Http announce and scrape
+- Supports IPv6. Compact mode or none.
+- Supports IP from http header. Nginx (X-Forwarded-For) or Cloudflare (CF-Forwarded-for). cf_header setting.
 - MySQLDB logging and stats (optional)
+- Cleanup torrents and users for memory safe.
 - Threading. All request is async.
 - High perfomance. Little bit more resource consumption than XBT at same load
 - UDP proto coming soon.
@@ -20,6 +23,11 @@ Simple Python Bittorrent Tracker (http only at this time)
 - /announce - main announce path
 - /scrape - srapper path
 
+# CLI Commands
+- stats - Print tracker stats
+- reload config - reloads config file and accept new vars
+
+# Test Tracker Hardware
 This tracker software tested at spec:
 - E3-1230v6 @3.50 Ghz
 - 16 Gb DDR4 2133 Mhz
