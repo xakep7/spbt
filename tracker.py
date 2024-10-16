@@ -18,7 +18,7 @@ from signal import signal, SIGPIPE, SIG_DFL
 from socket import error as SocketError
 import errno
 
-vers = "SPBT v0.4.9p3"
+vers = "SPBT v0.4.9p6"
 server_host = ''
 server_port = 8050
 interval = 1800
