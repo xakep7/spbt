@@ -43,6 +43,11 @@ class mysql_c:
 				if("tracker_torrents" not in dbs):
 					print("Table tracker_torrents not found. Creating...")
 					cursor.execute("create table if not exists tracker_torrents (id int not null auto_increment,info_hash varchar(64) not null,seeders int not null default 0,leechers int not null default 0,tsize bigint unsigned not null default 0,completed int not null default 0, updated int not null default 0,primary key (id),unique key (info_hash),index upd (updated));")
+				
+				if("tracker_whitelist" not in dbs):
+					print("Table tracker_whitelist not found. Creating...")
+					cursor.execute("create table if not exists tracker_whitelist (id int not null auto_increment,info_hash varchar(64) not null,type int not null default 0,primary key (id),unique key (info_hash));")
+				
 				if("tracker_users" not in dbs):
 					print("Table tracker_users not found. Creating...")
 					cursor.execute("create table if not exists tracker_users (id int not null auto_increment,peerhash varchar(64) not null,peerid varchar(40) not null,addr varchar(128) not null,port int not null default 0,ctime int not null default 0,utime int not null default 0,useragent varchar(256) not null,primary key (id),unique key (peerhash));")
@@ -195,6 +200,17 @@ class mysql_c:
 					torrents[row['info_hash']] = {"users":{},"leechers":0,"seaders":0,"size":row['tsize'],"completed":0,"updated":row['updated']}
 			print("loaded",len(torrents),"torrents From DB")
 		return torrents
+
+	def loadwhitelist(self):
+		self.reconnect()
+		q = self.query("SELECT * from tracker_whitelist")
+		whitelist = {}
+		if(q):
+			for row in q:
+				whitelist[row['info_hash']] = {"type":row['type']}
+			print("loaded",len(whitelist),"whitelist From DB")
+		return whitelist
+
 	def query_multiinsert(self,qr,data,tryes=0):
 		global connection_2
 		#dbs = {}
