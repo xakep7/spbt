@@ -30,10 +30,10 @@ Simple Python Bittorrent Tracker (http only at this time)
 
 # Test Tracker Hardware
 This tracker software tested at spec:
-- E3-1230v6 @3.50 Ghz
-- 16 Gb DDR4 2133 Mhz
-- 2x450 Gb NVMe PCI-e v3
-- 100k+ torrents and users. 580-700 announce req/s. Cpu consuption - 5-10%, Memory - 3-6%
+- i3-2100 CPU @ 3.10GHz
+- 8 Gb DDR3 1600 Mhz
+- 2x500 Gb HDD
+- 200k+ torrents and users. 580-700 announce req/s. Cpu consuption - 5-10%, Memory - 2-3 Gb Ram
   
 test tracker stats: https://tr2.trkb.ru/index.php?page=tracker  
 Code may has some shitcoding. Alpha.
