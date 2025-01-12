@@ -18,7 +18,7 @@ from signal import signal, SIGPIPE, SIG_DFL
 from socket import error as SocketError
 import errno
 
-vers = "SPBT v0.4.9p6"
+vers = "SPBT v0.5.0"
 server_host = ''
 server_port = 8050
 interval = 1800
@@ -29,6 +29,7 @@ sub_run = True
 scrape_int = 120
 cf_header = "X-Forwarded-For"
 torrents = {}
+whitelist = {}
 users = {}
 req_stats = {"ann":0,"scrape":0,"users":{"seaders":0,"leechers":0},"last_log":0,"last_ann":0,"start_time":0}
 cgitb.enable()
@@ -165,6 +166,11 @@ class HttpGetHandler(BaseHTTPRequestHandler):
 				self.wfile.write(bencodepy.bencode({"failure reason":"Invalid info_hash: '"+ get_req['info_hash'] +"' length "+ str(len(get_req['info_hash'])),"min interval":minint}))
 				return 0
 			get_req['info_hash'] = get_req['info_hash'].hex()
+			if(whitelisted):
+				if(get_req['info_hash'] in whitelist):
+					if(whitelist[get_req['info_hash']]['type'] == 1):
+						self.wfile.write(bencodepy.bencode({"failure reason":"Torrent is blacklisted by DMCA","min interval":minint}))
+						return 0
 			if('port' in get_req):
 				if(not isinstance(get_req['port'],int)):
 					get_req['port'] = int(get_req['port'])
@@ -218,6 +224,7 @@ class HttpGetHandler(BaseHTTPRequestHandler):
 					else:
 						complete = False
 				elif(get_req['event'] == "completed"):
+					torrents[get_req['info_hash']]['completed'] += 1
 					complete = True
 				elif(get_req['event'] == "stopped"):
 					if(peerhash in torrents[get_req['info_hash']]['users']):
@@ -250,7 +257,6 @@ class HttpGetHandler(BaseHTTPRequestHandler):
 				if(complete):
 					torrents[get_req['info_hash']]['seaders'] += 1
 					req_stats['users']['seaders'] += 1
-					torrents[get_req['info_hash']]['completed'] += 1
 				else:
 					torrents[get_req['info_hash']]['leechers'] += 1
 					req_stats['users']['leechers'] += 1
@@ -280,17 +286,6 @@ class HttpGetHandler(BaseHTTPRequestHandler):
 				#print("peerhash:" , user)
 				if(torrents[get_req['info_hash']]['users'][user]['timestamp'] < timestamp() - interval*1.2):
 					pass
-				#	if(torrents[get_req['info_hash']]['users'][user]['complete']):
-				#		if(torrents[get_req['info_hash']]['seaders'] > 0):
-				#			torrents[get_req['info_hash']]['seaders'] -= 1
-				#			req_stats['users']['seaders'] -= 1
-				#	else:
-				#		if(torrents[get_req['info_hash']]['leechers'] > 0):
-				#			torrents[get_req['info_hash']]['leechers'] -= 1
-				#			req_stats['users']['leechers'] -= 1
-				#	if(user in users):
-				#		users[user]['torrs'] = remove_array_item(users[user]['torrs'],get_req['info_hash'])
-				#	del torrents[get_req['info_hash']]['users'][user]
 				elif(get_req['info_hash'] in torrents and user in torrents[get_req['info_hash']]['users']):
 					if(torrents[get_req['info_hash']]['users'][user]['complete']):
 						seeds = seeds + 1
@@ -309,9 +304,6 @@ class HttpGetHandler(BaseHTTPRequestHandler):
 						else:
 							peers_ipv6[d] = {"peer id":users[torrents[get_req['info_hash']]['users'][user]['peer']]['peerid'],"ip":users[torrents[get_req['info_hash']]['users'][user]['peer']]['addr'],"port":users[torrents[get_req['info_hash']]['users'][user]['peer']]['port']}
 						d += 1
-			#if(compact == 1):
-			#	peers = str(peers)
-				#peers_ipv6 = str(peers_ipv6)
 			self.wfile.write(bencodepy.bencode({"interval":interval,"min interval":minint,"peers":peers,"peers6":peers_ipv6,"complete":seeds,"incomplete":leech}))
 		else:
 			self.wfile.write('<html><head><meta charset="utf-8">'.encode())
@@ -427,6 +419,8 @@ def logging(mysql_c,mysql_reload,mysql_loging,req_stats,torrents,users,cfg):
 					req_stats['last_log'] = timestamp()
 					req_stats['last_ann'] = req_stats['ann']
 					print(time_s()," Update stats: Completed")
+				if(whitelisted):
+					whitelist = msq_c.loadwhitelist()
 		time.sleep(1)
 	
 if __name__ == '__main__':
@@ -444,6 +438,7 @@ if __name__ == '__main__':
 		server_port = cfg.getint("OPTIONS","serverport")
 		server_host = cfg.get("OPTIONS","serverhost")
 		interval = cfg.getint("OPTIONS","announce_refresh")
+		whitelisted = cfg.getint("OPTIONS","whitelisted")
 		minint = cfg.getint("OPTIONS","announce_min")
 		scrape_int = cfg.getint("OPTIONS","scrape_int")
 		cf_header = cfg.get("OPTIONS","cf_header")
@@ -457,6 +452,8 @@ if __name__ == '__main__':
 			from mysql_log import *
 			msq = mysql_c(cfg.get("MYSQL","HOST"), cfg.get("MYSQL","USER"), cfg.get("MYSQL","PASSWORD"), cfg.get("MYSQL","NAME"))
 			torrents = msq.loadtorrents()
+			if(whitelisted):
+				whitelist = msq.loadwhitelist()
 			del msq
 		else:
 			print (time_s(),' Mysql connection disabled ',mysql_loging)
@@ -476,6 +473,7 @@ if __name__ == '__main__':
 				interval = cfg.getint("OPTIONS","announce_refresh")
 				minint = cfg.getint("OPTIONS","announce_min")
 				scrape_int = cfg.getint("OPTIONS","scrape_int")
+				whitelisted = cfg.getint("OPTIONS","whitelisted")
 				cf_header = cfg.get("OPTIONS","cf_header")
 				mysql_loging = cfg.getint("OPTIONS","mysql_store")
 				mysql_reload = cfg.getint("OPTIONS","mysql_reload")
