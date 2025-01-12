@@ -17,6 +17,7 @@ Simple Python Bittorrent Tracker (http only at this time)
 - Threading. All request is async.
 - High perfomance. Little bit more resource consumption than XBT at same load
 - UDP proto coming soon.
+- DMCA blacklist/whitelist.
 
 # Path
 - /stats - server statistics json output
